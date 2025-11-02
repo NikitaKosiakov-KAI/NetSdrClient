@@ -54,7 +54,7 @@ namespace EchoServer
                     byte[] buffer = new byte[8192];
                     int bytesRead;
 
-                    while (!token.IsCancellationRequested && (bytesRead = await stream.ReadAsync(buffer, token);) > 0)
+                    while (!token.IsCancellationRequested && (bytesRead = await stream.ReadAsync(buffer, token)) > 0)
                     {
                         // Echo back the received message
                         await stream.WriteAsync(buffer, 0, bytesRead, token);
