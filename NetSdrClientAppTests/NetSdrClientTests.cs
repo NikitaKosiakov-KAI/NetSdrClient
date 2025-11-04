@@ -115,5 +115,97 @@ public class NetSdrClientTests
         Assert.That(_client.IQStarted, Is.False);
     }
 
-    //TODO: cover the rest of the NetSdrClient code here
+    // Тест 1: Перевірка початкового стану
+    [Test]
+    public void Constructor_WhenCreated_IsNotConnected()
+    {
+        // Arrange (Підготовка) - вже зроблено в Setup
+
+        // Act (Дія)
+        bool isConnected = _sdrClient.IsConnected;
+
+        // Assert (Перевірка)
+        Assert.IsFalse(isConnected, "Клієнт не повинен бути підключений одразу після створення.");
+    }
+
+    // Тест 2: Перевірка успішного підключення
+    [Test]
+    public void Connect_WhenCalled_SetsIsConnectedToTrue()
+    {
+        // Arrange
+        // Налаштовуємо мок: коли буде викликано Connect, 
+        // ми імітуємо, що властивість 'Connected' стала true.
+        _mockTcpClient.Setup(client => client.Connect(It.IsAny<string>(), It.IsAny<int>()));
+        _mockTcpClient.Setup(client => client.Connected).Returns(true);
+
+        // Act
+        _sdrClient.Connect("127.0.0.1", 1234);
+
+        // Assert
+        Assert.IsTrue(_sdrClient.IsConnected, "IsConnected має стати true після підключення.");
+        // Переконуємось, що метод Connect нашого TCP клієнта був викликаний
+        _mockTcpClient.Verify(client => client.Connect("127.0.0.1", 1234), Times.Once);
+    }
+
+    // Тест 3: Перевірка успішного відключення
+    [Test]
+    public void Disconnect_WhenConnected_CallsCloseAndSetsIsConnectedToFalse()
+    {
+        // Arrange (Спочатку "підключимося")
+        _mockTcpClient.Setup(client => client.Connected).Returns(true);
+
+        // Act
+        _sdrClient.Disconnect();
+
+        // Assert
+        // Перевіряємо, що метод Close був викликаний на нашому мок-клієнті
+        _mockTcpClient.Verify(client => client.Close(), Times.Once);
+    }
+
+    // Тест 4: Перевірка помилки при спробі налаштування без підключення
+    [Test]
+    public void SetFrequency_WhenNotConnected_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        _mockTcpClient.Setup(client => client.Connected).Returns(false);
+
+        // Act & Assert
+        // Ми перевіряємо, що виконання коду призведе до викидання винятку
+        Assert.Throws<InvalidOperationException>(
+            () => _sdrClient.SetFrequency(100000000),
+            "Спроба змінити частоту без підключення має кидати виняток."
+        );
+    }
+
+    // Тест 5: Перевірка логіки, що не можна підключитись двічі
+    [Test]
+    public void Connect_WhenAlreadyConnected_DoesNotCallConnectAgain()
+    {
+        // Arrange
+        _mockTcpClient.Setup(client => client.Connected).Returns(true);
+
+        // Act
+        // Спробуємо підключитися, коли ми "вже підключені"
+        _sdrClient.Connect("127.0.0.1", 1234);
+
+        // Assert
+        // Перевіряємо, що метод Connect НЕ був викликаний (бо ми вже підключені)
+        _mockTcpClient.Verify(client => client.Connect(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    // Тест 6: Перевірка викидання винятку при невдалому підключенні
+    [Test]
+    public void Connect_WhenConnectionFails_ThrowsException()
+    {
+        // Arrange
+        // Імітуємо збій: метод Connect кидає виняток, наприклад, "SocketException"
+        _mockTcpClient.Setup(client => client.Connect(It.IsAny<string>(), It.IsAny<int>()))
+                      .Throws(new System.Net.Sockets.SocketException(10061)); // "Connection refused"
+
+        // Act & Assert
+        // Перевіряємо, що наш клієнт "прокидає" цей виняток назовні
+        Assert.Throws<System.Net.Sockets.SocketException>(
+            () => _sdrClient.Connect("127.0.0.1", 1234)
+        );
+    }
 }
