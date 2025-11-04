@@ -65,7 +65,11 @@ jobs:
           /d:sonar.exclusions=**/bin/**,**/obj/**,**/sonarcloud.yml `
           /d:sonar.qualitygate.wait=true
         shell: pwsh
-      # 3) COVERAGE
+      # 2) BUILD & TEST
+      - name: Restore
+        run: dotnet restore NetSdrClient.sln
+      - name: Build
+        run: dotnet build NetSdrClient.sln -c Release --no-restore
       - name: Tests with coverage (OpenCover)
         run: |
           dotnet test NetSdrClientAppTests/NetSdrClientAppTests.csproj -c Release --no-build `
@@ -73,11 +77,8 @@ jobs:
             /p:CoverletOutput=TestResults/coverage.xml `
             /p:CoverletOutputFormat=opencover
         shell: pwsh
-      # 2) BUILD & TEST
-      - name: Restore
-        run: dotnet restore NetSdrClient.sln
-      - name: Build
-        run: dotnet build NetSdrClient.sln -c Release --no-restore
+
+        # 3) COVERAGE
       - name: Tests with coverage (OpenCover)
         run: |
           dotnet test NetSdrClientAppTests/NetSdrClientAppTests.csproj -c Release --no-build `
