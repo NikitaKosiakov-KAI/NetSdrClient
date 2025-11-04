@@ -66,7 +66,7 @@ namespace NetSdrClientApp.Messages
             return msg.ToArray();
         }
 
-        public static bool TranslateMessage(byte[] msg, out MsgTypes type, out ControlItemCodes itemCode, out ushort sequenceNumber, out byte[] body)
+        internal static bool TranslateMessage(byte[] msg, out MsgTypes type, out ControlItemCodes itemCode, out ushort sequenceNumber, out byte[] body)
         {
             itemCode = ControlItemCodes.None;
             sequenceNumber = 0;
@@ -83,9 +83,9 @@ namespace NetSdrClientApp.Messages
                 msgEnumarable = msgEnumarable.Skip(_msgControlItemLength);
                 msgLength -= _msgControlItemLength;
 
-                if (Enum.IsDefined(typeof(ControlItemCodes), value))
+                if (Enum.IsDefined(typeof(ControlItemCodes), (int)value))
                 {
-                    itemCode = (ControlItemCodes)value;
+                    itemCode = (ControlItemCodes)(int)value;
                 }
                 else
                 {
@@ -106,7 +106,7 @@ namespace NetSdrClientApp.Messages
             return success;
         }
 
-        public static IEnumerable<int> GetSamples(ushort sampleSize, byte[] body)
+        internal static IEnumerable<int> GetSamples(ushort sampleSize, byte[] body)
         {
             sampleSize /= 8; //to bytes
             if (sampleSize  > 4)
@@ -128,7 +128,7 @@ namespace NetSdrClientApp.Messages
             }
         }
 
-        private static byte[] GetHeader(MsgTypes type, int msgLength)
+        internal static byte[] GetHeader(MsgTypes type, int msgLength)
         {
             int lengthWithHeader = msgLength + 2;
 
@@ -146,7 +146,7 @@ namespace NetSdrClientApp.Messages
             return BitConverter.GetBytes((ushort)(lengthWithHeader + ((int)type << 13)));
         }
 
-        private static void TranslateHeader(byte[] header, out MsgTypes type, out int msgLength)
+        internal static void TranslateHeader(byte[] header, out MsgTypes type, out int msgLength)
         {
             var num = BitConverter.ToUInt16(header.ToArray());
             type = (MsgTypes)(num >> 13);
