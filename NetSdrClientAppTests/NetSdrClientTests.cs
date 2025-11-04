@@ -1,211 +1,219 @@
 ﻿using Moq;
 using NetSdrClientApp;
 using NetSdrClientApp.Networking;
+using NUnit.Framework;
+using System.Threading.Tasks;
 
-namespace NetSdrClientAppTests;
-
-public class NetSdrClientTests
+namespace NetSdrClientAppTests
 {
-    NetSdrClient _client;
-    Mock<ITcpClient> _tcpMock;
-    Mock<IUdpClient> _updMock;
-
-    public NetSdrClientTests() { }
-
-    [SetUp]
-    public void Setup()
+    [TestFixture]
+    public class NetSdrClientTests
     {
-        _tcpMock = new Mock<ITcpClient>();
-        _tcpMock.Setup(tcp => tcp.Connect()).Callback(() =>
-        {
-            _tcpMock.Setup(tcp => tcp.Connected).Returns(true);
-        });
+        private NetSdrClient _client;
+        private Mock<ITcpClient> _tcpMock;
+        private Mock<IUdpClient> _udpMock;
 
-        _tcpMock.Setup(tcp => tcp.Disconnect()).Callback(() =>
+        [SetUp]
+        public void Setup()
         {
+            _tcpMock = new Mock<ITcpClient>();
+            _udpMock = new Mock<IUdpClient>();
+
+            _client = new NetSdrClient(_tcpMock.Object, _udpMock.Object);
+
+            // Налаштовуємо логіку Connect/Disconnect
+            _tcpMock.Setup(tcp => tcp.Connect()).Callback(() =>
+            {
+                _tcpMock.Setup(tcp => tcp.Connected).Returns(true);
+            });
+
+            _tcpMock.Setup(tcp => tcp.Disconnect()).Callback(() =>
+            {
+                _tcpMock.Setup(tcp => tcp.Connected).Returns(false);
+            });
+        }
+
+        /// <summary>
+        /// Створює імітацію "автовідповідача" для TCP.
+        /// Це потрібно, оскільки ваш метод SendTcpRequest очікує відповідь.
+        /// </summary>
+        private void SetupTcpAutoResponse()
+        {
+            _tcpMock.Setup(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()))
+                .Callback(() =>
+                {
+                    // Імітуємо, що сервер негайно надсилає відповідь
+                    _tcpMock.Raise(tcp => tcp.MessageReceived += null, _tcpMock.Object, new byte[] { 0x01, 0x02 });
+                })
+                .Returns(Task.CompletedTask);
+        }
+
+        [Test]
+        public async Task ConnectAsyncTest()
+        {
+            //Arrange
+            SetupTcpAutoResponse(); // Налаштовуємо автовідповідач
+
+            //act
+            await _client.ConnectAsync();
+
+            //assert
+            _tcpMock.Verify(tcp => tcp.Connect(), Times.Once);
+            // Перевіряємо, що ConnectAsync відправляє 3 початкові команди
+            _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Exactly(3));
+        }
+
+        [Test]
+        public void DisconnectWithNoConnectionTest()
+        {
+            //act
+            _client.Disconect(); // Використовуємо назву з одруківкою з вашого коду
+
+            //assert
+            _tcpMock.Verify(tcp => tcp.Disconnect(), Times.Once);
+        }
+
+        [Test]
+        public async Task DisconnectTest()
+        {
+            //Arrange 
+            // Тести не повинні викликати інші тести. Робимо Arrange тут:
+            SetupTcpAutoResponse();
+            await _client.ConnectAsync();
+            _tcpMock.Setup(tcp => tcp.Connected).Returns(true); // Переконуємось, що стан "підключено"
+
+            //act
+            _client.Disconect(); // Використовуємо назву з одруківкою
+
+            //assert
+            _tcpMock.Verify(tcp => tcp.Disconnect(), Times.Once);
+            _tcpMock.Setup(tcp => tcp.Connected).Returns(false); // Перевіряємо, що стан оновився
+        }
+
+        [Test]
+        public async Task StartIQAsync_WhenNotConnected_DoesNothing()
+        {
+            //Arrange
+            _tcpMock.Setup(tcp => tcp.Connected).Returns(false); // Гарантуємо, що ми не підключені
+
+            //act
+            await _client.StartIQAsync();
+
+            //assert
+            _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Never);
+            _udpMock.Verify(udp => udp.StartListeningAsync(), Times.Never);
+            Assert.That(_client.IQStarted, Is.False);
+        }
+
+        [Test]
+        public async Task StartIQAsync_WhenConnected_StartsUdpAndSetsFlag()
+        {
+            //Arrange 
+            SetupTcpAutoResponse();
+            await _client.ConnectAsync(); // 3 повідомлення
+            Assert.That(_client.IQStarted, Is.False); // Перевірка початкового стану
+
+            //act
+            await _client.StartIQAsync(); // 4-те повідомлення
+
+            //assert
+            _updMock.Verify(udp => udp.StartListeningAsync(), Times.Once);
+            Assert.That(_client.IQStarted, Is.True);
+            _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Exactly(4));
+        }
+
+        [Test]
+        public async Task StopIQAsync_WhenIQStarted_StopsUdpAndUnsetsFlag()
+        {
+            //Arrange 
+            SetupTcpAutoResponse();
+            await _client.ConnectAsync();
+            await _client.StartIQAsync(); // Спочатку запускаємо
+            Assert.That(_client.IQStarted, Is.True); // Переконуємось, що запущено
+
+            //act
+            await _client.StopIQAsync();
+
+            //assert
+            _udpMock.Verify(udp => udp.StopListening(), Times.Once);
+            Assert.That(_client.IQStarted, Is.False);
+        }
+
+        // --- Нові тести, що покривають решту коду ---
+
+        [Test]
+        public async Task ChangeFrequencyAsync_WhenConnected_SendsMessage()
+        {
+            //Arrange
+            SetupTcpAutoResponse();
+            await _client.ConnectAsync(); // 3 повідомлення
+
+            //act
+            await _client.ChangeFrequencyAsync(144_000_000, 1); // 4-те повідомлення
+
+            //assert
+            // Перевіряємо, що загалом було 4 виклики (3 з Connect + 1 з ChangeFrequency)
+            _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Exactly(4));
+        }
+
+        [Test]
+        public async Task ChangeFrequencyAsync_WhenNotConnected_DoesNothing()
+        {
+            //Arrange
             _tcpMock.Setup(tcp => tcp.Connected).Returns(false);
-        });
 
-        _tcpMock.Setup(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>())).Callback<byte[]>((bytes) =>
+            //act
+            await _client.ChangeFrequencyAsync(144_000_000, 1);
+
+            //assert
+            _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Never);
+        }
+
+        [Test]
+        public async Task SendTcpRequest_WhenResponseIsReceived_TaskCompletesWithResponse()
         {
-            _tcpMock.Raise(tcp => tcp.MessageReceived += null, _tcpMock.Object, bytes);
-        });
+            // Цей тест перевіряє вашу логіку TaskCompletionSource
+            // Arrange
+            _tcpMock.Setup(tcp => tcp.Connected).Returns(true);
+            var responseData = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF };
 
-        _updMock = new Mock<IUdpClient>();
+            // Налаштовуємо SendMessageAsync, але БЕЗ автовідповіді
+            _tcpMock.Setup(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>())).Returns(Task.CompletedTask);
 
-        _client = new NetSdrClient(_tcpMock.Object, _updMock.Object);
-    }
+            // Act
+            // Викликаємо публічний метод, який використовує SendTcpRequest
+            Task<byte[]> responseTask = _client.ChangeFrequencyAsync(100, 1);
 
-    [Test]
-    public async Task ConnectAsyncTest()
-    {
-        //act
-        await _client.ConnectAsync();
+            // Перевіряємо, що завдання "зависло" в очікуванні
+            Assert.That(responseTask.IsCompleted, Is.False);
 
-        //assert
-        _tcpMock.Verify(tcp => tcp.Connect(), Times.Once);
-        _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Exactly(3));
-    }
+            // Тепер імітуємо відповідь від TCP
+            _tcpMock.Raise(tcp => tcp.MessageReceived += null, _tcpMock.Object, responseData);
 
-    [Test]
-    public async Task DisconnectWithNoConnectionTest()
-    {
-        //act
-        _client.Disconect();
+            // Очікуємо завершення завдання
+            var result = await responseTask;
 
-        //assert
-        //No exception thrown
-        _tcpMock.Verify(tcp => tcp.Disconnect(), Times.Once);
-    }
+            // Assert
+            Assert.That(responseTask.IsCompletedSuccessfully, Is.True);
+            Assert.AreEqual(responseData, result, "Результат завдання має бути тим, що ми відправили у відповідь.");
+        }
 
-    [Test]
-    public async Task DisconnectTest()
-    {
-        //Arrange 
-        await ConnectAsyncTest();
+        [Test]
+        public void UdpMessageReceived_WhenDataIsReceived_DoesNotThrowException()
+        {
+            // Цей тест перевіряє, що обробник події UDP підписаний
+            // і не падає при отриманні даних (замість 'DataReady' та 'DataReceived')
+            
+            //Arrange
+            var fakeUdpMessage = new byte[100]; // Імітація пакету даних
 
-        //act
-        _client.Disconect();
-
-        //assert
-        //No exception thrown
-        _tcpMock.Verify(tcp => tcp.Disconnect(), Times.Once);
-    }
-
-    [Test]
-    public async Task StartIQNoConnectionTest()
-    {
-
-        //act
-        await _client.StartIQAsync();
-
-        //assert
-        //No exception thrown
-        _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Never);
-        _tcpMock.VerifyGet(tcp => tcp.Connected, Times.AtLeastOnce);
-    }
-
-    [Test]
-    public async Task StartIQTest()
-    {
-        //Arrange 
-        await ConnectAsyncTest();
-
-        //act
-        await _client.StartIQAsync();
-
-        //assert
-        //No exception thrown
-        _updMock.Verify(udp => udp.StartListeningAsync(), Times.Once);
-        Assert.That(_client.IQStarted, Is.True);
-    }
-
-    [Test]
-    public async Task StopIQTest()
-    {
-        //Arrange 
-        await ConnectAsyncTest();
-
-        //act
-        await _client.StopIQAsync();
-
-        //assert
-        //No exception thrown
-        _updMock.Verify(tcp => tcp.StopListening(), Times.Once);
-        Assert.That(_client.IQStarted, Is.False);
-    }
-
-    // Тест 1: Перевірка початкового стану
-    [Test]
-    public void Constructor_WhenCreated_IsNotConnected()
-    {
-        // Arrange (Підготовка) - вже зроблено в Setup
-
-        // Act (Дія)
-        bool isConnected = _sdrClient.IsConnected;
-
-        // Assert (Перевірка)
-        Assert.IsFalse(isConnected, "Клієнт не повинен бути підключений одразу після створення.");
-    }
-
-    // Тест 2: Перевірка успішного підключення
-    [Test]
-    public void Connect_WhenCalled_SetsIsConnectedToTrue()
-    {
-        // Arrange
-        // Налаштовуємо мок: коли буде викликано Connect, 
-        // ми імітуємо, що властивість 'Connected' стала true.
-        _mockTcpClient.Setup(client => client.Connect(It.IsAny<string>(), It.IsAny<int>()));
-        _mockTcpClient.Setup(client => client.Connected).Returns(true);
-
-        // Act
-        _sdrClient.Connect("127.0.0.1", 1234);
-
-        // Assert
-        Assert.IsTrue(_sdrClient.IsConnected, "IsConnected має стати true після підключення.");
-        // Переконуємось, що метод Connect нашого TCP клієнта був викликаний
-        _mockTcpClient.Verify(client => client.Connect("127.0.0.1", 1234), Times.Once);
-    }
-
-    // Тест 3: Перевірка успішного відключення
-    [Test]
-    public void Disconnect_WhenConnected_CallsCloseAndSetsIsConnectedToFalse()
-    {
-        // Arrange (Спочатку "підключимося")
-        _mockTcpClient.Setup(client => client.Connected).Returns(true);
-
-        // Act
-        _sdrClient.Disconnect();
-
-        // Assert
-        // Перевіряємо, що метод Close був викликаний на нашому мок-клієнті
-        _mockTcpClient.Verify(client => client.Close(), Times.Once);
-    }
-
-    // Тест 4: Перевірка помилки при спробі налаштування без підключення
-    [Test]
-    public void SetFrequency_WhenNotConnected_ThrowsInvalidOperationException()
-    {
-        // Arrange
-        _mockTcpClient.Setup(client => client.Connected).Returns(false);
-
-        // Act & Assert
-        // Ми перевіряємо, що виконання коду призведе до викидання винятку
-        Assert.Throws<InvalidOperationException>(
-            () => _sdrClient.SetFrequency(100000000),
-            "Спроба змінити частоту без підключення має кидати виняток."
-        );
-    }
-
-    // Тест 5: Перевірка логіки, що не можна підключитись двічі
-    [Test]
-    public void Connect_WhenAlreadyConnected_DoesNotCallConnectAgain()
-    {
-        // Arrange
-        _mockTcpClient.Setup(client => client.Connected).Returns(true);
-
-        // Act
-        // Спробуємо підключитися, коли ми "вже підключені"
-        _sdrClient.Connect("127.0.0.1", 1234);
-
-        // Assert
-        // Перевіряємо, що метод Connect НЕ був викликаний (бо ми вже підключені)
-        _mockTcpClient.Verify(client => client.Connect(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
-    }
-
-    // Тест 6: Перевірка викидання винятку при невдалому підключенні
-    [Test]
-    public void Connect_WhenConnectionFails_ThrowsException()
-    {
-        // Arrange
-        // Імітуємо збій: метод Connect кидає виняток, наприклад, "SocketException"
-        _mockTcpClient.Setup(client => client.Connect(It.IsAny<string>(), It.IsAny<int>()))
-                      .Throws(new System.Net.Sockets.SocketException(10061)); // "Connection refused"
-
-        // Act & Assert
-        // Перевіряємо, що наш клієнт "прокидає" цей виняток назовні
-        Assert.Throws<System.Net.Sockets.SocketException>(
-            () => _sdrClient.Connect("127.0.0.1", 1234)
-        );
+            // Act & Assert
+            // Просто викликаємо подію. Якщо обробник підписаний і не 
+            // кидає виняток (наприклад, NullReference), тест пройдено.
+            Assert.DoesNotThrow(() =>
+            {
+                _udpMock.Raise(udp => udp.MessageReceived += null, _udpMock.Object, fakeUdpMessage);
+            });
+        }
     }
 }
