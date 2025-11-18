@@ -5,14 +5,11 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading.Tasks;
 
-using NetSdrClientApp.Networking; // <--- ЦЕ ПОРУШЕННЯ!
-
 namespace NetSdrClientApp.Messages
 {
     //TODO: analyze possible use of [StructLayout] for better performance and readability 
     public static class NetSdrMessageHelper
     {
-        static TcpClientWrapper temp = null;
 
         private const short _maxMessageLength = 8191;
         private const short _maxDataItemMessageLength = 8194;
