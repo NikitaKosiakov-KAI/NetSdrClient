@@ -49,7 +49,7 @@ namespace NetSdrClientApp.Messages
             return GetMessage(type, ControlItemCodes.None, parameters);
         }
 
-        private static byte[] GetMessage(MsgTypes type, ControlItemCodes itemCode, byte[] parameters)
+        public static byte[] GetMessage(MsgTypes type, ControlItemCodes itemCode, byte[] parameters)
         {
             var itemCodeBytes = Array.Empty<byte>();
             if (itemCode != ControlItemCodes.None)
@@ -129,7 +129,7 @@ namespace NetSdrClientApp.Messages
             }
         }
 
-        private static byte[] GetHeader(MsgTypes type, int msgLength)
+        public static byte[] GetHeader(MsgTypes type, int msgLength)
         {
             int lengthWithHeader = msgLength + 2;
 
@@ -147,7 +147,7 @@ namespace NetSdrClientApp.Messages
             return BitConverter.GetBytes((ushort)(lengthWithHeader + ((int)type << 13)));
         }
 
-        private static void TranslateHeader(byte[] header, out MsgTypes type, out int msgLength)
+        public static void TranslateHeader(byte[] header, out MsgTypes type, out int msgLength)
         {
             var num = BitConverter.ToUInt16(header.ToArray());
             type = (MsgTypes)(num >> 13);
