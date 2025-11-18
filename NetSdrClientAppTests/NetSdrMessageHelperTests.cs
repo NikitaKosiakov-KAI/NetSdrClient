@@ -91,23 +91,19 @@ namespace NetSdrClientAppTests
         public void TranslateMessage_WithDataItem_ParsesSequenceNumber()
         {
             // Arrange
-            // Використовуємо DataItem0, щоб умову (type < MsgTypes.DataItem0) стала false.
-            // Це перекине виконання на рядок 97.
             var type = NetSdrMessageHelper.MsgTypes.DataItem0;
             
             // Тестовий номер послідовності (Sequence Number)
             ushort expectedSeqNum = 12345;
             byte[] seqBytes = BitConverter.GetBytes(expectedSeqNum);
             
-            // Якісь дані (тіло повідомлення)
+            // Тіло повідомлення
             byte[] dataBody = new byte[] { 0xAA, 0xBB, 0xCC }; 
 
-            // Довжина повідомлення = 2 байти (Sequence) + 3 байти (Data) = 5
-            ushort msgLength = (ushort)(seqBytes.Length + dataBody.Length);
+            // Загальна довжина "навантаження" = Sequence (2) + Data (3) = 5
+            ushort payloadLength = (ushort)(seqBytes.Length + dataBody.Length);
 
-            // Формуємо заголовок
-            ushort headerVal = (ushort)(msgLength + ((int)type << 13));
-            byte[] header = BitConverter.GetBytes(headerVal);
+            byte[] header = NetSdrMessageHelper.GetHeader(type, payloadLength);
 
             // Збираємо повне повідомлення: Header + Sequence + Data
             byte[] message = header.Concat(seqBytes).Concat(dataBody).ToArray();
@@ -117,11 +113,10 @@ namespace NetSdrClientAppTests
                 out var outType, out var outCode, out var outSeq, out var outBody);
 
             // Assert
-            Assert.IsTrue(success);
+            Assert.IsTrue(success, "Парсинг має пройти успішно, якщо заголовок сформовано коректно");
             Assert.AreEqual(NetSdrMessageHelper.MsgTypes.DataItem0, outType);
-            // Це покриває рядок 98: sequenceNumber = ...
-            Assert.AreEqual(expectedSeqNum, outSeq, "Sequence number має бути розпаршений коректно");
-            Assert.AreEqual(dataBody, outBody, "Тіло повідомлення має збігатися");
+            Assert.AreEqual(expectedSeqNum, outSeq);
+            Assert.AreEqual(dataBody, outBody);
         }
     }
 }
