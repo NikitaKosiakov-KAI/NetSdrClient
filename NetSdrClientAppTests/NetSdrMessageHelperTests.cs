@@ -86,5 +86,42 @@ namespace NetSdrClientAppTests
             // Assert
             Assert.IsFalse(success, "Метод має повернути false для невідомого ControlItemCode");
         }
+
+        [Test]
+        public void TranslateMessage_WithDataItem_ParsesSequenceNumber()
+        {
+            // Arrange
+            // Використовуємо DataItem0, щоб умову (type < MsgTypes.DataItem0) стала false.
+            // Це перекине виконання на рядок 97.
+            var type = NetSdrMessageHelper.MsgTypes.DataItem0;
+            
+            // Тестовий номер послідовності (Sequence Number)
+            ushort expectedSeqNum = 12345;
+            byte[] seqBytes = BitConverter.GetBytes(expectedSeqNum);
+            
+            // Якісь дані (тіло повідомлення)
+            byte[] dataBody = new byte[] { 0xAA, 0xBB, 0xCC }; 
+
+            // Довжина повідомлення = 2 байти (Sequence) + 3 байти (Data) = 5
+            ushort msgLength = (ushort)(seqBytes.Length + dataBody.Length);
+
+            // Формуємо заголовок
+            ushort headerVal = (ushort)(msgLength + ((int)type << 13));
+            byte[] header = BitConverter.GetBytes(headerVal);
+
+            // Збираємо повне повідомлення: Header + Sequence + Data
+            byte[] message = header.Concat(seqBytes).Concat(dataBody).ToArray();
+
+            // Act
+            bool success = NetSdrMessageHelper.TranslateMessage(message, 
+                out var outType, out var outCode, out var outSeq, out var outBody);
+
+            // Assert
+            Assert.IsTrue(success);
+            Assert.AreEqual(NetSdrMessageHelper.MsgTypes.DataItem0, outType);
+            // Це покриває рядок 98: sequenceNumber = ...
+            Assert.AreEqual(expectedSeqNum, outSeq, "Sequence number має бути розпаршений коректно");
+            Assert.AreEqual(dataBody, outBody, "Тіло повідомлення має збігатися");
+        }
     }
 }
