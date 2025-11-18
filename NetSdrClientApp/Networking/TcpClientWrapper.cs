@@ -71,7 +71,7 @@ namespace NetSdrClientApp.Networking
             }
         }
 
-        virtual async Task SendMessageAsync(byte[] data)
+        public virtual async Task SendMessageAsync(byte[] data)
         {
             if (Connected && _stream != null && _stream.CanWrite)
             {
