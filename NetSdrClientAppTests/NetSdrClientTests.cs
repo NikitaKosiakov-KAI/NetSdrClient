@@ -27,7 +27,6 @@ public class NetSdrClientTests
             _tcpMock.Setup(tcp => tcp.Connected).Returns(false);
         });
 
-        // Auto-response (Echo) setup
         _tcpMock.Setup(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>())).Callback<byte[]>((bytes) =>
         {
             _tcpMock.Raise(tcp => tcp.MessageReceived += null, _tcpMock.Object, bytes);
@@ -121,16 +120,14 @@ public class NetSdrClientTests
         await _client.ChangeFrequencyAsync(1000000, 0);
 
         //assert
-        // 3 calls from Connect + 1 from ChangeFrequency
         _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()), Times.Exactly(4));
     }
 
     [Test]
-    public void SendTcpRequestWaitLogicTest()
+    public async Task SendTcpRequestWaitLogicTest()
     {
         //Arrange
         _tcpMock.Setup(x => x.Connected).Returns(true);
-        // Override Setup to NOT auto-reply immediately
         _tcpMock.Setup(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>())).Returns(Task.CompletedTask);
 
         //act
@@ -139,10 +136,12 @@ public class NetSdrClientTests
         //assert
         Assert.IsFalse(task.IsCompleted);
 
-        // Simulate delayed response
         _tcpMock.Raise(tcp => tcp.MessageReceived += null, _tcpMock.Object, new byte[] { 0x00, 0x01 });
 
-        Assert.IsTrue(task.IsCompleted);
+        var completedTask = await Task.WhenAny(task, Task.Delay(1000));
+        
+        Assert.That(completedTask, Is.EqualTo(task));
+        Assert.IsTrue(task.IsCompletedSuccessfully);
     }
 
     [Test]
