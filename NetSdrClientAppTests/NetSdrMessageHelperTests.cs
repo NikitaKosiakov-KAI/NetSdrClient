@@ -64,6 +64,27 @@ namespace NetSdrClientAppTests
             Assert.That(parametersBytes.Count(), Is.EqualTo(parametersLength));
         }
 
-        //TODO: add more NetSdrMessageHelper tests
+        [Test]
+        public void TranslateMessage_WithInvalidControlItemCode_ReturnsFalse()
+        {
+            // Arrange
+            var type = NetSdrMessageHelper.MsgTypes.SetControlItem; 
+            ushort length = 2; // Довжина тіла (2 байти для коду)
+            
+            ushort headerVal = (ushort)(length + ((int)type << 13));
+            byte[] header = BitConverter.GetBytes(headerVal);
+
+            ushort invalidCode = ushort.MaxValue; 
+            byte[] body = BitConverter.GetBytes(invalidCode);
+
+            byte[] message = header.Concat(body).ToArray();
+
+            // Act
+            bool success = NetSdrMessageHelper.TranslateMessage(message, 
+                out var outType, out var outCode, out var outSeq, out var outBody);
+
+            // Assert
+            Assert.IsFalse(success, "Метод має повернути false для невідомого ControlItemCode");
+        }
     }
 }
