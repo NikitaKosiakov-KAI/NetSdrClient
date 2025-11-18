@@ -1,5 +1,6 @@
 using NetArchTest.Rules;
 using NUnit.Framework;
+using NetSdrClientApp;
 using NetSdrClientApp.Messages;
 using NetSdrClientApp.Networking;
 
