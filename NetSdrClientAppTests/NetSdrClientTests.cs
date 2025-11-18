@@ -156,13 +156,11 @@ namespace NetSdrClientAppTests
             }, "Обробник UDP не повинен падати з ArgumentException на 'сміттєвих' даних після виправлення.");
         }
 
-        // --- ТЕСТИ ДЛЯ NetSdrMessageHelper (З ВИПРАВЛЕННЯМИ) ---
+        // --- ТЕСТИ ДЛЯ NetSdrMessageHelper ---
 
         [Test]
         public void TranslateMessage_WithInvalidControlItemCode_ReturnsFalse()
         {
-            // Arrange
-            // ВИПРАВЛЕННЯ: Додано 'NetSdrMessageHelper.' перед 'MsgTypes'
             int typeInt = (int)NetSdrMessageHelper.MsgTypes.SetControlItem; 
             int length = 2;
             ushort headerNum = (ushort)(length + (typeInt << 13)); 
@@ -213,20 +211,35 @@ namespace NetSdrClientAppTests
         [Test]
         public void TranslateHeader_WhenDataMessageLengthIsZero_SetsMaxDataLength()
         {
-            // Arrange
             int msgLengthForMax = _maxDataMessageLength - 2; 
             
-            // ВИПРАВЛЕННЯ: (CS0117) + (CS0103)
             byte[] header = NetSdrMessageHelper.GetHeader(NetSdrMessageHelper.MsgTypes.DataItem0, msgLengthForMax);
 
-            // Act
-            // ВИПРАВЛЕННЯ: (CS0117)
             NetSdrMessageHelper.TranslateHeader(header, out var outType, out var outLength);
 
-            // Assert
-            // ВИПРАВЛЕННЯ: (CS0103)
             Assert.AreEqual(NetSdrMessageHelper.MsgTypes.DataItem0, outType);
             Assert.AreEqual(_maxDataMessageLength, outLength);
+        }
+
+        [Test]
+        public void TranslateMessage_WithInvalidControlItemCode_ReturnsFalse()
+        {
+            var type = NetSdrMessageHelper.MsgTypes.SetControlItem; 
+            ushort length = 2; 
+            
+            ushort headerVal = (ushort)(length + ((int)type << 13));
+            byte[] header = BitConverter.GetBytes(headerVal);
+
+            ushort invalidItemCode = ushort.MaxValue; 
+            byte[] body = BitConverter.GetBytes(invalidItemCode);
+
+            byte[] message = header.Concat(body).ToArray();
+
+            // Act
+            bool success = NetSdrMessageHelper.TranslateMessage(message, 
+                out var outType, out var outCode, out var outSeq, out var outData);
+
+            Assert.IsFalse(success, "TranslateMessage should return false when the Item Code is not valid in the Enum.");
         }
     }
 }
