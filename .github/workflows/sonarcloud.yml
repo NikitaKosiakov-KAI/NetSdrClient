@@ -72,19 +72,18 @@ jobs:
         run: dotnet build NetSdrClient.sln -c Release --no-restore
       - name: Tests with coverage (OpenCover)
         run: |
+          # 1. Запуск першої збірки та створення початкового звіту
           dotnet test NetSdrClientAppTests/NetSdrClientAppTests.csproj -c Release --no-build `
             /p:CollectCoverage=true `
             /p:CoverletOutput=TestResults/coverage.xml `
             /p:CoverletOutputFormat=opencover
-        shell: pwsh
-
-        # 3) COVERAGE
-      - name: Tests with coverage (OpenCover)
-        run: |
-          dotnet test NetSdrClientAppTests/NetSdrClientAppTests.csproj -c Release --no-build `
+      
+          # 2. Запуск другої збірки та ОБ'ЄДНАННЯ результатів
+          dotnet test EchoTspServer.Tests/EchoServerTests.csproj -c Release --no-build `
             /p:CollectCoverage=true `
             /p:CoverletOutput=TestResults/coverage.xml `
-            /p:CoverletOutputFormat=opencover
+            /p:CoverletOutputFormat=opencover `
+            /p:MergeWithExisting=true
         shell: pwsh
       # 4) END: SonarScanner
       - name: SonarScanner End
