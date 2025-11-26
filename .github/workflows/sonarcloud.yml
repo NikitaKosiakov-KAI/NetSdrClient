@@ -79,7 +79,7 @@ jobs:
             /p:CoverletOutputFormat=opencover
       
           # 2. Запуск другої збірки та ОБ'ЄДНАННЯ результатів
-          dotnet test EchoTspServerTests/EchoServerTests.csproj -c Release --no-build `
+          dotnet test EchoServerTests/EchoServerTests.csproj -c Release --no-build `
             /p:CollectCoverage=true `
             /p:CoverletOutput=TestResults/coverage.xml `
             /p:CoverletOutputFormat=opencover `
