@@ -25,6 +25,7 @@ namespace EchoServerTests
         [TearDown]
         public void TearDown()
         {
+            _stringWriter?.Dispose();
             Console.SetOut(_originalConsoleOut);
         }
 
