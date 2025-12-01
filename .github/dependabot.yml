@@ -1,4 +1,4 @@
-# .github/dependabot.yml
+
 version: 2
 updates:
   - package-ecosystem: "nuget"
@@ -7,3 +7,4 @@ updates:
       interval: "weekly"
     # Опціонально: обмежити кількість PR, щоб не заспамити
     open-pull-requests-limit: 10
+# restart trigger
