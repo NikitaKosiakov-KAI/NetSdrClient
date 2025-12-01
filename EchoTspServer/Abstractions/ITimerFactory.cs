@@ -1,4 +1,7 @@
-public interface ITimerFactory
+namespace EchoTspServer
 {
-    ITimer Create(TimerCallback callback, object? state, int dueTime, int period);
+    public interface ITimerFactory
+    {
+        ITimer Create(TimerCallback callback, object? state, int dueTime, int period);
+    }
 }
