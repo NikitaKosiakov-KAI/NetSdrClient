@@ -1,6 +1,9 @@
-public interface ITimer : IDisposable
+namespace EchoTspServer
 {
-    void Change(int dueTime, int period);
+    public interface ITimer : IDisposable
+    {
+        void Change(int dueTime, int period);
+    }
+    
+    public delegate void TimerCallback(object? state);
 }
-
-public delegate void TimerCallback(object? state);
