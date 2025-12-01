@@ -1,0 +1,4 @@
+public interface IUdpClient : IDisposable
+{
+    void Send(byte[] dgram, int bytes, IPEndPoint endPoint);
+}
