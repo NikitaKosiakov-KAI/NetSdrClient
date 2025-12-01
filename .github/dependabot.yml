@@ -1,0 +1,9 @@
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/" # Шукає .sln або .csproj у корені
+    schedule:
+      interval: "weekly"
+    # Опціонально: обмежити кількість PR, щоб не заспамити
+    open-pull-requests-limit: 10
